@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <strong>ClassMeet</strong>
+    <button id="logout" class="link hidden">Log out</button>
+  </header>
+
+  <main>
+    <!-- Log in / Sign up -->
+    <section id="v-auth">
+      <div class="tabs">
+        <button data-tab="login" class="on">Log in</button>
+        <button data-tab="signup">Sign up</button>
+      </div>
+      <input id="email" type="email" placeholder="Email" autocomplete="email" />
+      <input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" />
+      <div id="roles" class="roles hidden">
+        <label><input type="radio" name="role" value="student" checked /><span>Student</span></label>
+        <label><input type="radio" name="role" value="teacher" /><span>Teacher</span></label>
+      </div>
+      <button id="submit" class="primary">Log in</button>
+    </section>
+
+    <!-- Teacher -->
+    <section id="v-teacher" class="hidden">
+      <p class="label">Your class code</p>
+      <div class="code-row"><span id="t-code" class="code">------</span><button id="t-copy" class="link">Copy</button></div>
+      <p class="hint">Share this with your students. They enter it once in their extension.</p>
+
+      <div id="t-idle">
+        <button id="t-start" class="primary">Start class on Google Meet</button>
+      </div>
+      <div id="t-live" class="hidden">
+        <p class="live">● Class is live</p>
+        <p id="t-link" class="hint"></p>
+        <div id="t-paste" class="hidden">
+          <input id="t-url" placeholder="Paste an existing Meet link" />
+          <button id="t-attach" class="secondary">Use this link</button>
+        </div>
+        <button id="t-end" class="danger">End class &amp; email reports</button>
+      </div>
+      <button id="t-dash" class="secondary">Open dashboard</button>
+    </section>
+
+    <!-- Student -->
+    <section id="v-student" class="hidden">
+      <p class="label">Join a class</p>
+      <div class="row">
+        <input id="s-code" placeholder="Class code" maxlength="6" />
+        <button id="s-join" class="primary">Join</button>
+      </div>
+      <div id="s-classes"></div>
+      <p class="label">Recent attendance</p>
+      <div id="s-recent" class="hint">Nothing yet.</div>
+    </section>
+
+    <p id="msg" role="status"></p>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
