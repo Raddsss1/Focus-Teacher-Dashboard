@@ -1,4 +1,7 @@
 (() => {
+  const VERSION = "v4";
+  console.log("[ClassMeet] content script", VERSION, "loaded:", location.href);
+
   const CODE_RE = /^\/([a-z]{3}-[a-z]{4}-[a-z]{3})\/?$/;
   const IN_CALL = [
     'button[aria-label*="Leave call" i]',
@@ -15,9 +18,8 @@
     away: false,
     lastResolve: 0,
     joinedAt: 0,
-    error: "",
     teacher: false,
-    ended: false,
+    note: "",
   };
   let badge = null,
     running = false,
@@ -45,7 +47,13 @@
     `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   function paint() {
-    if (!st.sessionId && !st.ended && !st.error) {
+    let text = st.note;
+    if (st.sessionId) {
+      text = st.joined
+        ? `Tracking · ${clock(Math.floor((Date.now() - st.joinedAt) / 1000))}${st.away ? " · tab away" : ""}${st.note ? " · " + st.note : ""}`
+        : "Live class found. Join the call to start tracking.";
+    }
+    if (!st.code || !text) {
       badge?.remove();
       badge = null;
       return;
@@ -54,16 +62,10 @@
       badge = document.createElement("div");
       badge.style.cssText =
         "position:fixed;left:16px;bottom:88px;z-index:2147483647;padding:8px 12px;border-radius:8px;" +
-        "background:#131b26;color:#fff;font:600 12px/1.3 system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:none;max-width:280px";
+        "background:#131b26;color:#fff;font:600 12px/1.3 system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:none;max-width:300px";
       document.body.appendChild(badge);
     }
-    if (st.error) badge.textContent = `ClassMeet error: ${st.error}`;
-    else if (st.ended) badge.textContent = "ClassMeet: class ended";
-    else if (!st.joined)
-      badge.textContent =
-        "ClassMeet: live class found. Join the call to start tracking.";
-    else
-      badge.textContent = `ClassMeet tracking · ${clock(Math.floor((Date.now() - st.joinedAt) / 1000))}${st.away ? " · tab away" : ""}`;
+    badge.textContent = "ClassMeet: " + text;
   }
 
   function reset() {
@@ -72,9 +74,8 @@
       joined: false,
       away: false,
       lastResolve: 0,
-      error: "",
       teacher: false,
-      ended: false,
+      note: "",
     });
     paint();
   }
@@ -85,25 +86,39 @@
       reset();
       st.code = code;
     }
-    if (!code || st.teacher) return;
+    if (!code) {
+      paint();
+      return;
+    }
+    if (st.teacher) return;
 
     if (!st.sessionId) {
-      if (Date.now() - st.lastResolve < 30000) return; // look for a live class every 30s
+      if (Date.now() - st.lastResolve < 15000) return;
       st.lastResolve = Date.now();
+      st.note = "Checking for a live class…";
+      paint();
       const ctx = await send({ type: "resolve", code });
-      if (ctx?.error) {
-        st.error = ctx.error;
+      console.log("[ClassMeet] resolve", code, ctx);
+      if (!ctx || ctx.error) {
+        st.note =
+          ctx?.error ||
+          "No reply from the extension. Reload it and refresh this tab.";
         paint();
         return;
       }
-      if (ctx?.mode === "teacher") {
+      if (ctx.mode === "teacher") {
         st.teacher = true;
+        st.note = "";
+        paint();
         return;
       }
-      if (ctx?.mode !== "student") return;
+      if (ctx.mode !== "student") {
+        st.note = ctx.reason || "No live class found for this Meet link.";
+        paint();
+        return;
+      }
       st.sessionId = ctx.sessionId;
-      st.ended = false;
-      st.error = "";
+      st.note = "";
     }
 
     const call = inCall(),
@@ -131,14 +146,12 @@
       tabActive: !away,
       event,
     });
-    console.log("[ClassMeet]", { event, call, away, res });
-    if (res?.error) st.error = res.error;
-    else st.error = "";
+    console.log("[ClassMeet] presence", { event, call, away, res });
+    st.note = res?.error ? "Error: " + res.error : "";
     if (res?.status === "session_inactive") {
-      // class ended: stop, but keep looking for the next one
       st.sessionId = null;
       st.joined = false;
-      st.ended = true;
+      st.note = "Class ended.";
       st.lastResolve = Date.now();
     }
     paint();
@@ -160,6 +173,19 @@
     }
   }
 
+  chrome.runtime.onMessage.addListener((m, _s, reply) => {
+    if (m.type === "status") {
+      reply({
+        version: VERSION,
+        sessionId: !!st.sessionId,
+        joined: st.joined,
+        inCall: inCall(),
+        teacher: st.teacher,
+        note: st.note,
+      });
+    }
+  });
+
   let t;
   const soon = () => {
     clearTimeout(t);
@@ -177,8 +203,7 @@
         event: "left",
       });
   });
-
-  setInterval(evaluate, 10000); // heartbeat
-  setInterval(paint, 1000); // on-screen timer
+  setInterval(evaluate, 10000);
+  setInterval(paint, 1000);
   setTimeout(evaluate, 1500);
 })();

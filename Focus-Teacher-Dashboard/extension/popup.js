@@ -6,7 +6,6 @@ import {
   getProfile,
   rest,
   rpc,
-  callFunction,
   fmt,
 } from "./api.js";
 import { DASHBOARD_URL } from "./config.js";
@@ -19,7 +18,8 @@ const esc = (t) =>
   );
 let tab = "login";
 let teacherClass = null,
-  liveSession = null;
+  liveSession = null,
+  nowTimer;
 
 function msg(text = "", ok = false) {
   const m = $("msg");
@@ -49,8 +49,6 @@ document.querySelectorAll(".tabs button").forEach((b) =>
       .forEach((x) => x.classList.toggle("on", x === b));
     $("roles").classList.toggle("hidden", tab !== "signup");
     $("submit").textContent = tab === "signup" ? "Create account" : "Log in";
-    $("password").autocomplete =
-      tab === "signup" ? "new-password" : "current-password";
     msg();
   }),
 );
@@ -155,11 +153,36 @@ $("t-end").addEventListener("click", () =>
   }),
 );
 
-$("t-dash").addEventListener("click", () =>
-  chrome.tabs.create({ url: DASHBOARD_URL }),
-);
+$("t-dash").addEventListener("click", () => {
+  const url = /^https?:\/\//i.test(DASHBOARD_URL)
+    ? DASHBOARD_URL
+    : `https://${DASHBOARD_URL}`;
+  chrome.tabs.create({ url });
+});
 
 /* ───────── Student ───────── */
+async function refreshNow() {
+  const s = await getSession();
+  if (!s) return;
+  const rows = await rest(
+    `attendance?student_id=eq.${s.user.id}&in_meeting=eq.true&sessions.status=eq.active&select=total_seconds,away_count,sessions!inner(status)&limit=1`,
+  );
+  clearInterval(nowTimer);
+  const el = $("s-now");
+  if (!rows.length) {
+    el.textContent = "Not in a class right now.";
+    return;
+  }
+  const base = rows[0].total_seconds,
+    t0 = Date.now();
+  const draw = () => {
+    el.innerHTML = `<b>${fmt(base + Math.floor((Date.now() - t0) / 1000))}</b><br>Left the tab ${rows[0].away_count}×`;
+  };
+  draw();
+  nowTimer = setInterval(draw, 1000);
+}
+setInterval(() => refreshNow().catch(() => {}), 10000);
+
 async function loadStudent() {
   show("v-student");
   const s = await getSession();
@@ -197,6 +220,7 @@ async function loadStudent() {
         )
         .join("<br>")
     : "Nothing yet.";
+  refreshNow().catch(() => {});
 }
 
 $("s-join").addEventListener("click", () =>
@@ -207,6 +231,67 @@ $("s-join").addEventListener("click", () =>
     $("s-code").value = "";
     msg("You joined the class.", true);
     await loadStudent();
+  }),
+);
+
+$("s-check").addEventListener("click", () =>
+  guard(async () => {
+    const s = await getSession();
+    if (!s) throw new Error("Not logged in.");
+    const p = await getProfile();
+    const out = [`Logged in as: ${s.user.email} (${p?.role})`];
+    const enr = await rest(
+      `enrollments?student_id=eq.${s.user.id}&select=class_id`,
+    );
+    out.push(`Classes joined: ${enr.length}`);
+    const tabs = await chrome.tabs.query({ url: "https://meet.google.com/*" });
+    if (!tabs.length) out.push("Meet tab: none open in this Chrome profile");
+    for (const t of tabs) {
+      const code = (t.url.match(
+        /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/,
+      ) || [])[1];
+      out.push(`Meet tab: ${code || t.url}`);
+      if (!code) continue;
+      const direct = await rest(
+        `sessions?meeting_code=eq.${code}&status=eq.active&select=id`,
+      );
+      out.push(
+        `  Database sees ${direct.length} live session(s) for this code`,
+      );
+      const bg = await new Promise((res) =>
+        chrome.runtime.sendMessage({ type: "resolve", code }, (x) =>
+          res(
+            chrome.runtime.lastError
+              ? { error: chrome.runtime.lastError.message }
+              : x,
+          ),
+        ),
+      );
+      out.push(`  Background worker replies: ${JSON.stringify(bg)}`);
+      const pg = await new Promise((res) =>
+        chrome.tabs.sendMessage(t.id, { type: "status" }, (x) =>
+          res(chrome.runtime.lastError ? null : x),
+        ),
+      );
+      out.push(
+        pg
+          ? `  Meet page: script=${pg.version} in-call=${pg.inCall} tracking=${pg.joined} sessionFound=${pg.sessionId} teacherMode=${pg.teacher} note="${pg.note || ""}"`
+          : "  Meet page: extension NOT running here (refresh the tab)",
+      );
+      if (direct.length) {
+        try {
+          const r = await rpc("record_presence", {
+            p_session: direct[0].id,
+            p_tab_active: true,
+            p_event: "heartbeat",
+          });
+          out.push(`  Direct save test: ${JSON.stringify(r)}`);
+        } catch (e) {
+          out.push(`  Direct save test FAILED: ${e.message}`);
+        }
+      }
+    }
+    $("s-report").textContent = out.join("\n");
   }),
 );
 
