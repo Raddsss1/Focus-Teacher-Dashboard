@@ -43,10 +43,11 @@ export default function Dashboard() {
         .select("student_id, profiles(name, email)")
         .eq("class_id", cls.id);
 
-      const { data: attendance } = await supabase
+      const { data: attendance, error: attError } = await supabase
         .from("attendance")
         .select("student_id, total_seconds, sessions!inner(class_id)")
         .eq("sessions.class_id", cls.id);
+      if (attError) console.error("attendance error:", attError);
 
       // add up each student's time across all sessions
       const totals = {};

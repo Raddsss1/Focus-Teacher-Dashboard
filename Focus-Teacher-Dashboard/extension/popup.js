@@ -148,15 +148,10 @@ $("t-attach").addEventListener("click", () =>
 
 $("t-end").addEventListener("click", () =>
   guard(async () => {
-    if (!confirm("End the class and email every student their report?")) return;
-    $("t-end").disabled = true;
-    msg("Sending reports…", true);
-    const r = await callFunction("send-attendance-report", {
-      session_id: liveSession.id,
-    });
-    msg(`Done. ${r.sent} of ${r.students} student emails sent.`, true);
+    if (!confirm("End the class and save attendance?")) return;
+    const r = await rpc("end_session", { p_session: liveSession.id });
+    msg(`Class ended. ${r.attended} student(s) attended.`, true);
     await loadTeacher();
-    $("t-end").disabled = false;
   }),
 );
 
