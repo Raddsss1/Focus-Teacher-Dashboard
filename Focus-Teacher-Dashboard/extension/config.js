@@ -3,4 +3,4 @@
 export const SUPABASE_URL = "https://pjiqmarubaosjcolbedj.supabase.co";
 export const SUPABASE_ANON_KEY =
   "sb_publishable_LnU7abHy1huAnLhGDV5kFQ_Fk8V_N8C";
-export const DASHBOARD_URL = "https://YOUR-APP.vercel.app";
+export const DASHBOARD_URL = "focus-teacher-dashboard-xfny.vercel.app";
