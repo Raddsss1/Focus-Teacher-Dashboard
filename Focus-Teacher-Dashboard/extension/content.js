@@ -2,7 +2,7 @@
   const VERSION = "v4";
   console.log("[ClassMeet] content script", VERSION, "loaded:", location.href);
 
-  const CODE_RE = /^\/([a-z]{3}-[a-z]{4}-[a-z]{3})\/?$/;
+  const CODE_RE = /^\/(?:meet\/)?([a-z]{3}-[a-z]{4}-[a-z]{3})\/?$/;
   const IN_CALL = [
     'button[aria-label*="Leave call" i]',
     'button[jsname="CQylAd"]',
