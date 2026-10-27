@@ -134,20 +134,11 @@ export default function Dashboard() {
             Teacher Dashboard
           </h1>
           <button
-            className="underline text-slate-400 cursor-pointer hover:text-slate-200 transition-colors"
+            className="underline text-slate-400 cursor-pointer mb-4 hover:text-slate-200 transition-colors"
             onClick={() => supabase.auth.signOut()}
           >
             Log out
           </button>
-          {/* CLASS CODE */}
-          <div className="flex items-center gap-4 mb-4 mt-4">
-            <p>
-              Your class code:{" "}
-              <span className="font-mono font-bold text-yellow-300 text-xl">
-                {classCode}
-              </span>
-            </p>
-          </div>
           {/* STUDENTS TABLE */}
           <table className="table-auto border-collapse border border-slate-500">
             <thead>
