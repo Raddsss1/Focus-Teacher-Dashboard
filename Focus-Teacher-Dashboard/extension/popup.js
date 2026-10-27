@@ -248,7 +248,7 @@ $("s-check").addEventListener("click", () =>
     if (!tabs.length) out.push("Meet tab: none open in this Chrome profile");
     for (const t of tabs) {
       const code = (t.url.match(
-        /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/,
+        /meet\.google\.com\/(?:meet\/)?([a-z]{3}-[a-z]{4}-[a-z]{3})/,
       ) || [])[1];
       out.push(`Meet tab: ${code || t.url}`);
       if (!code) continue;
